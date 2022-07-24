@@ -67,6 +67,67 @@ public:
     {
         return this->promise().value;
     }
+
+    RetType& Value()
+    {
+        return const_cast<RetType &>(static_cast<const Generator*>(this)->Value());
+    }
+
+public:
+    class iterator
+    {
+    public:
+        iterator() = default;
+        iterator(Generator* g)
+            : _ptr(g)
+        {
+
+        }
+
+        RetType& operator *()
+        {
+            return _ptr->Value();
+        }
+
+        Generator* operator->()
+        {
+            return _ptr;
+        }
+
+        const RetType& operator*() const
+        {
+            return _ptr->Value();
+        }
+
+        iterator& operator++()
+        {
+            _ptr->resume();
+            if (_ptr->done())
+            {
+                _ptr = nullptr;
+                return *this;
+            }
+            
+            return *this;
+        }
+
+        bool operator==(const iterator& other) const = default;
+
+    private:
+        Generator* _ptr = nullptr;
+    };
+
+    iterator begin()
+    {
+        iterator iter{ this };
+        iter->resume();
+        return iter;
+    }
+
+    iterator end()
+    {
+        return iterator{};
+    }
 };
 
 
@@ -81,12 +142,10 @@ Generator<int> Test()
 int main()
 {
     Generator gen = Test();
-    gen.resume();
-    while (!gen.done())
+    for (int ii : gen)
     {
-        std::cout << gen.Value() << std::endl;
-        gen.resume();
+        std::cout << ii << std::endl;
     }
-    
+
     return 0;
 }
