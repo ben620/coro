@@ -1,3 +1,8 @@
+/**
+ * (c) 2023 author benyuan
+ * originaly published at https://github.com/ben620/coro/blob/master/coro/CoGenerator.h 
+ * this is a demo usage of c++ 20 coroutine
+*/
 #pragma once
 #include <coroutine>
 #include <exception>
