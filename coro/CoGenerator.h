@@ -1,6 +1,7 @@
 #pragma once
-
 #include <coroutine>
+#include <exception>
+#include <utility>
 
 template <class ValueType>
 struct CoPromiseType
@@ -37,11 +38,45 @@ struct CoPromiseType
 
     std::suspend_always yield_value(ValueType&& v)
     {
-        value = std::move(v);
+        value = std::forward(v);
         return std::suspend_always();
     }
 
     ValueType value;
+};
+
+
+template <>
+struct CoPromiseType<void>
+{
+    std::suspend_always initial_suspend()
+    {
+        return std::suspend_always();
+    }
+
+    std::suspend_always final_suspend() noexcept
+    {
+        return std::suspend_always();
+    }
+
+    void unhandled_exception()
+    {
+        std::terminate();
+    }
+
+    std::coroutine_handle<CoPromiseType> get_return_object()
+    {
+        return std::coroutine_handle<CoPromiseType>::from_promise(*this);
+    }
+
+    void return_void()
+    {
+    }
+
+    std::suspend_always yield_value(void)
+    {
+        return std::suspend_always();
+    }
 };
 
 template <class RetType>
