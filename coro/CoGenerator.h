@@ -85,10 +85,12 @@ struct CoPromiseType<void>
 
     std::suspend_always return_void() noexcept
     {
+        return std::suspend_always();
     }
    
     std::suspend_always yield_value()
     {
+        return std::suspend_always();
     }
 };
 
