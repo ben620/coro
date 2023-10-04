@@ -5,7 +5,7 @@
 #include <filesystem>
 #include <string>
 
-CoGenerator<std::string> ListFiles(std::string_view path)
+CoGeneratorYield<std::string> ListFiles(std::string_view path)
 {
     for (const auto& path : std::filesystem::recursive_directory_iterator(path))
     {
@@ -13,7 +13,7 @@ CoGenerator<std::string> ListFiles(std::string_view path)
     }
 }
 
-CoGenerator<int> Test()
+CoGeneratorYield<int> Test()
 {
     co_yield 1;
     co_yield 2;
@@ -23,7 +23,7 @@ CoGenerator<int> Test()
 
 int main()
 {
-    CoGenerator gen = Test();
+    CoGeneratorYield gen = Test();
     for (int ii : gen)
     {
         std::cout << ii << std::endl;

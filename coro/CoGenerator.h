@@ -33,16 +33,63 @@ struct CoPromiseType
 
     std::suspend_always return_value(ValueType&& v) noexcept 
     {
-        return yield_value(std::forward<ValueType>(v));
+        return yield_value(std::move(v));
+    }
+
+    std::suspend_always return_value(const ValueType& v) noexcept
+    {
+        return yield_value(v);
     }
 
     std::suspend_always yield_value(ValueType&& v)
     {
-        value = std::forward<ValueType>(v);
+        value = std::move<ValueType>(v);
+        return std::suspend_always();
+    }
+
+    std::suspend_always yield_value(const ValueType& v)
+    {
+        value = v;
         return std::suspend_always();
     }
 
     ValueType value;
+};
+
+
+
+
+
+template <>
+struct CoPromiseType<void>
+{
+    std::suspend_always initial_suspend()
+    {
+        return std::suspend_always();
+    }
+
+    std::suspend_always final_suspend() noexcept
+    {
+        return std::suspend_always();
+    }
+
+    void unhandled_exception()
+    {
+        std::terminate();
+    }
+
+    std::coroutine_handle<CoPromiseType> get_return_object()
+    {
+        return std::coroutine_handle<CoPromiseType>::from_promise(*this);
+    }
+
+    std::suspend_always return_void() noexcept
+    {
+    }
+   
+    std::suspend_always yield_value()
+    {
+    }
 };
 
 
@@ -135,43 +182,13 @@ public:
 };
 
 
-struct CoPromiseTypeVoid
-{
-    std::suspend_always initial_suspend()
-    {
-        return std::suspend_always();
-    }
 
-    std::suspend_always final_suspend() noexcept
-    {
-        return std::suspend_always();
-    }
-
-    void unhandled_exception()
-    {
-        std::terminate();
-    }
-
-    std::coroutine_handle<CoPromiseTypeVoid> get_return_object()
-    {
-        return std::coroutine_handle<CoPromiseTypeVoid>::from_promise(*this);
-    }
-
-    void return_void()
-    {
-    }
-
-    std::suspend_always yield_value(void)
-    {
-        return std::suspend_always();
-    }
-};
 
 template <>
-struct CoGenerator<void> : public std::coroutine_handle<CoPromiseTypeVoid>
+struct CoGenerator<void> : public std::coroutine_handle<CoPromiseType<void>>
 {
 public:
-    using promise_type = CoPromiseTypeVoid;
+    using promise_type = CoPromiseType<void>;
 
     CoGenerator(std::coroutine_handle<promise_type> handle)
         : std::coroutine_handle<promise_type>(handle)
@@ -220,6 +237,138 @@ public:
 
     private:
         CoGenerator* _ptr = nullptr;
+    };
+
+    iterator begin()
+    {
+        iterator iter{ this };
+        iter->resume();
+        return iter;
+    }
+
+    iterator end()
+    {
+        return iterator{};
+    }
+};
+
+
+
+template <class ValueType>
+struct CoPromiseTypeYieldOnly
+{
+    std::suspend_always initial_suspend()
+    {
+        return std::suspend_always();
+    }
+
+    std::suspend_always final_suspend() noexcept
+    {
+        return std::suspend_always();
+    }
+
+    void unhandled_exception()
+    {
+        std::terminate();
+    }
+
+    std::coroutine_handle<CoPromiseTypeYieldOnly> get_return_object()
+    {
+        return std::coroutine_handle<CoPromiseTypeYieldOnly>::from_promise(*this);
+    }
+
+    std::suspend_always return_void() noexcept
+    {
+        return std::suspend_always();
+    }
+
+    std::suspend_always yield_value(ValueType&& v)
+    {
+        value = std::move(v);
+        return std::suspend_always();
+    }
+
+    std::suspend_always yield_value(const ValueType& v)
+    {
+        value = v;
+        return std::suspend_always();
+    }
+
+    ValueType value;
+};
+
+template <class RetType>
+struct CoGeneratorYield : public std::coroutine_handle<CoPromiseTypeYieldOnly<RetType>>
+{
+public:
+    using promise_type = CoPromiseTypeYieldOnly<RetType>;
+
+    CoGeneratorYield(std::coroutine_handle<promise_type> handle)
+        : std::coroutine_handle<promise_type>(handle)
+    {
+    }
+
+    CoGeneratorYield() = delete;
+    CoGeneratorYield(const CoGeneratorYield&) = delete;
+    void operator=(const CoGeneratorYield&) = delete;
+
+    ~CoGeneratorYield()
+    {
+        this->destroy();
+    }
+
+    const RetType& Value() const
+    {
+        return this->promise().value;
+    }
+
+    RetType& Value()
+    {
+        return const_cast<RetType&>(static_cast<const CoGeneratorYield*>(this)->Value());
+    }
+
+public:
+    class iterator
+    {
+    public:
+        iterator() = default;
+        iterator(CoGeneratorYield* g)
+            : _ptr(g)
+        {
+
+        }
+
+        RetType& operator *()
+        {
+            return _ptr->Value();
+        }
+
+        CoGeneratorYield* operator->()
+        {
+            return _ptr;
+        }
+
+        const RetType& operator*() const
+        {
+            return _ptr->Value();
+        }
+
+        iterator& operator++()
+        {
+            _ptr->resume();
+            if (_ptr->done())
+            {
+                _ptr = nullptr;
+                return *this;
+            }
+
+            return *this;
+        }
+
+        bool operator==(const iterator& other) const = default;
+
+    private:
+        CoGeneratorYield* _ptr = nullptr;
     };
 
     iterator begin()
