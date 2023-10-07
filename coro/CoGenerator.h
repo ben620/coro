@@ -88,28 +88,49 @@ struct CoPromiseType<void>
 
 
 template <class RetType>
-struct CoGenerator : public std::coroutine_handle<CoPromiseType<RetType>>
+struct CoGenerator
 {
 public:
     using promise_type = CoPromiseType<RetType>;
 
     CoGenerator(std::coroutine_handle<promise_type> handle)
-        : std::coroutine_handle<promise_type>(handle)
+        : _handle(std::move(handle))
     {
     }
 
-    CoGenerator() = delete;
+    CoGenerator() = default;
     CoGenerator(const CoGenerator&) = delete;
     void operator=(const CoGenerator&) = delete;
+    void operator=(CoGenerator&& r) noexcept
+    {
+        if (this == &r)
+        {
+            return;
+        }
+        _handle = std::move(r._handle);
+        r._handle = nullptr;
+    }
+    CoGenerator(CoGenerator&& r) noexcept
+    {
+        if (this == &r)
+        {
+            return;
+        }
+        _handle = std::move(r._handle);
+        r._handle = nullptr;
+    }
 
     ~CoGenerator()
     {
-        this->destroy();
+        if (_handle)
+        {
+            _handle->destroy();
+        }
     }
 
     const RetType& Value() const
     {
-        return this->promise().value;
+        return _handle->promise().value;
     }
 
     RetType& Value()
@@ -172,28 +193,60 @@ public:
     {
         return iterator{};
     }
+
+private:
+    void resume()
+    {
+        if (_handle)
+        {
+            _handle.resume();
+        }
+    }
+
+    std::coroutine_handle<CoPromiseType<RetType>> _handle;
 };
 
 
 
 template <>
-struct CoGenerator<void> : public std::coroutine_handle<CoPromiseType<void>>
+struct CoGenerator<void>
 {
 public:
     using promise_type = CoPromiseType<void>;
 
-    CoGenerator(std::coroutine_handle<promise_type> handle)
-        : std::coroutine_handle<promise_type>(handle)
+    CoGenerator(std::coroutine_handle<promise_type> handle) noexcept
+        : _handle(std::move(handle))
     {
     }
 
-    CoGenerator() = delete;
+    CoGenerator() = default;
     CoGenerator(const CoGenerator&) = delete;
     void operator=(const CoGenerator&) = delete;
+    void operator=(CoGenerator && r) noexcept
+    {
+        if (this == &r)
+        {
+            return;
+        }
+        _handle = std::move(r._handle);
+        r._handle = nullptr;
+    }
+    CoGenerator(CoGenerator&& r) noexcept
+    {
+        if (this == &r)
+        {
+            return;
+        }
+        _handle = std::move(r._handle);
+        r._handle = nullptr;
+    }
 
     ~CoGenerator()
     {
-        this->destroy();
+        if (_handle)
+        {
+            _handle.destroy();
+        }
     }
 
 public:
@@ -214,8 +267,8 @@ public:
 
         iterator& operator++()
         {
-            _ptr->resume();
-            if (_ptr->done())
+            _ptr->_handle.resume();
+            if (_ptr->_handle.done())
             {
                 _ptr = nullptr;
                 return *this;
@@ -233,7 +286,7 @@ public:
     iterator begin()
     {
         iterator iter{ this };
-        iter->resume();
+        iter->_handle.resume();
         return iter;
     }
 
@@ -241,6 +294,18 @@ public:
     {
         return iterator{};
     }
+
+private:
+
+    void resume()
+    {
+        if (_handle)
+        {
+            _handle.resume();
+        }
+    }
+
+    std::coroutine_handle<CoPromiseType<void>> _handle;
 };
 
 
